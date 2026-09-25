@@ -53,4 +53,4 @@ pwsh -File C:\Tools\GoodbyeDPI\gh-download.ps1 -Url <release下载地址>
 ## 致谢
 
 - [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) by ValdikSS（DPI 绕过内核，GPLv3）
-- 本仓库的脚本可自由使用，仅供网络调试与学习用途
+- 本仓库脚本采用 [MIT 许可证](LICENSE)，仅供网络调试与学习用途
