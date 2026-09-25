@@ -5,9 +5,30 @@ param(
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Continue'
 
+# 未指定保存文件名时：优先用服务器返回的官方文件名（Content-Disposition），拿不到再退回 URL 尾段
 if (-not $OutFile) {
-  $name = ([Uri]$Url).Segments[-1] -replace '[?&=]', '_'
-  if (-not $name) { $name = 'github-download.bin' }
+  $name = ''
+  $headers = & curl.exe -sIL --connect-timeout 10 --max-time 30 $Url 2>$null | Out-String
+
+  $mUtf8 = [regex]::Matches($headers, "filename\*\s*=\s*UTF-8''([^;\r\n]+)")
+  $mQuoted = [regex]::Matches($headers, 'filename\s*=\s*"([^"\r\n]+)"')
+  $mPlain = [regex]::Matches($headers, 'filename\s*=\s*([^;\r\n"]+)')
+
+  if ($mUtf8.Count -gt 0) {
+    # RFC 5987 编码的文件名（常见于中文名文件）
+    $name = [System.Uri]::UnescapeDataString((($mUtf8[$mUtf8.Count - 1].Groups[1].Value).Trim()).Trim('"'))
+  } elseif ($mQuoted.Count -gt 0) {
+    $name = ($mQuoted[$mQuoted.Count - 1].Groups[1].Value).Trim()
+  } elseif ($mPlain.Count -gt 0) {
+    $name = (($mPlain[$mPlain.Count - 1].Groups[1].Value).Trim()).Trim('"')
+  }
+
+  # 清洗非法字符，防止目录穿越
+  $name = $name -replace '[\\/:*?"<>|]', '_'
+  if (-not $name) {
+    $name = [System.IO.Path]::GetFileName(([Uri]$Url).AbsolutePath)
+    if (-not $name) { $name = 'github-download.bin' }
+  }
   $OutFile = Join-Path (Get-Location) $name
 }
 

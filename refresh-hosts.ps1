@@ -10,6 +10,12 @@ function Log([string]$msg) {
   Add-Content -Path $logFile -Value $line -Encoding utf8
 }
 
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+  Log '错误：需要管理员权限才能写入 hosts，请以管理员身份运行（双击配套的 .cmd 会自动提权）。'
+  exit 1
+}
+
 $fastly133 = @('185.199.109.133','185.199.108.133','185.199.110.133','185.199.111.133')
 $fastly215 = @('185.199.109.215','185.199.108.215','185.199.110.215','185.199.111.215')
 $pools = [ordered]@{
@@ -72,9 +78,14 @@ if ($chosen.Count -gt 0) {
   $isAscii = $true
   foreach ($ch in $text.ToCharArray()) { if ([int]$ch -gt 127) { $isAscii = $false; break } }
   $enc = if ($isAscii) { [System.Text.Encoding]::ASCII } else { New-Object System.Text.UTF8Encoding($false) }
-  [System.IO.File]::WriteAllText($hostsPath, $text, $enc)
-  & ipconfig.exe /flushdns | Out-Null
-  Log ("hosts 已更新（{0} 条钉选），DNS 缓存已刷新" -f $chosen.Count)
+  try {
+    [System.IO.File]::WriteAllText($hostsPath, $text, $enc)
+    & ipconfig.exe /flushdns | Out-Null
+    Log ("hosts 已更新（{0} 条钉选），DNS 缓存已刷新" -f $chosen.Count)
+  } catch {
+    Log ("错误：写入 hosts 失败：" + $_.Exception.Message)
+    exit 1
+  }
 } else {
   Log '本轮未找到健康 IP，hosts 保持原样'
 }
